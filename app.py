@@ -92,6 +92,7 @@ def mostrar_tela_principal():
     # Previsões
     previsoes = fazer_previsoes(dados, metrica)
     
+    
     # Plotando os resultados históricos e as previsões
     fig, ax = plt.subplots()
     ax.plot(dados['data'], dados[metrica], label='Histórico')
