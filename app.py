@@ -1,5 +1,9 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
+from prophet import Prophet
+
+
 
 # Simula a função de carregar os dados do usuário (substitua pela sua lógica de banco de dados)
 def carregar_usuarios():
@@ -49,16 +53,66 @@ def mostrar_tela_login():
         else:
             st.error("Usuário ou senha inválidos.")
 
-# Função para renderizar a tela após o login
+def fazer_previsoes(dados, metrica):
+    # Preparando os dados para o Prophet
+    df_prophet = pd.DataFrame({
+        'ds': dados['data'],
+        'y': dados[metrica]
+    })
+    
+    # Inicializando e ajustando o modelo
+    m = Prophet(yearly_seasonality=True, daily_seasonality=True)
+    m.fit(df_prophet)
+    
+    # Criando um dataframe para o futuro
+    futuro = m.make_future_dataframe(periods=90)  # 3 meses
+    
+    # Fazendo as previsões
+    previsao = m.predict(futuro)
+    
+    return previsao[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+
+
+
 def mostrar_tela_principal():
     st.title(f"Bem vindo(a), {st.session_state['email']}")
-    
+
     dados = carregar_dados_atividade(st.session_state['id_cliente'])
-    st.metric("Impressões", dados['impressoes'].sum())
-    st.metric("Cliques", dados['cliques'].sum())
-    st.metric("Registros", dados['registros'].sum())
-    st.metric("Gasto", f"R$ {dados['gasto'].sum():.2f}")
-    st.line_chart(dados.set_index('data')['impressoes'])
+
+    # KPIs alinhados horizontalmente
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Impressões", dados['impressoes'].sum())
+    col2.metric("Cliques", dados['cliques'].sum())
+    col3.metric("Registros", dados['registros'].sum())
+    col4.metric("Gasto", f"R$ {dados['gasto'].sum():.2f}")
+
+    # Seletor para métrica do gráfico de linha
+    metrica = st.selectbox("Escolha a métrica para visualizar no gráfico", ['impressoes', 'cliques', 'registros', 'gasto'])
+    
+    # Previsões
+    previsoes = fazer_previsoes(dados, metrica)
+    
+    # Plotando os resultados históricos e as previsões
+    fig, ax = plt.subplots()
+    ax.plot(dados['data'], dados[metrica], label='Histórico')
+    ax.plot(previsoes['ds'], previsoes['yhat'], label='Previsão', linestyle='--')
+    ax.fill_between(previsoes['ds'], previsoes['yhat_lower'], previsoes['yhat_upper'], alpha=0.3)
+    ax.set_title(f'{metrica.capitalize()} ao longo do tempo com previsões')
+    ax.set_xlabel('Data')
+    ax.set_ylabel(metrica.capitalize())
+    ax.legend()
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
+    # Criação do gráfico de barra para Gasto x Data
+    fig, ax = plt.subplots()
+    ax.bar(dados['data'], dados['gasto'], color='lightgreen')
+    ax.set_title('Gasto ao longo do tempo')
+    ax.set_xlabel('Data')
+    ax.set_ylabel('Gasto')
+    ax.grid(True)
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
 
     if st.button("Sair"):
         for key in list(st.session_state.keys()):
