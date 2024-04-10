@@ -1,0 +1,126 @@
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+from prophet import Prophet
+
+def carregar_usuarios():
+    return pd.DataFrame({
+        'email': ['usuario1@example.com', 'usuario2@example.com'],
+        'senha': ['senha1', 'senha2'],
+        'id_cliente': [1, 2],
+        'nome' : ['teste1', 'teste2']
+    })
+
+def verificar_login(email, senha, usuarios):
+    usuario = usuarios[(usuarios['email'] == email) & (usuarios['senha'] == senha)]
+    if not usuario.empty:
+        st.session_state['email'] = email
+        st.session_state['id_cliente'] = usuario['id_cliente'].values[0]
+        st.session_state['logado'] = True
+
+
+def carregar_dados_atividade(id_cliente):
+    return pd.DataFrame({
+        'id_cliente': [id_cliente] * 10,
+        'nome_do_usuario': ['usuario1'] * 10,
+        'data': pd.to_datetime(['2023-03-25', '2023-03-26', '2023-03-27', '2023-03-28', '2023-03-29', '2023-03-30', '2023-03-31','2023-04-01','2023-04-02', '2023-04-03']),
+        'impressoes': [5539, 74780, 68888, 63877, 19155, 90000, 99843, 23413, 47323, 13452],
+        'cliques': [78, 2736, 4094, 4709, 1310, 23,5436,7546,2456,1345],
+        'gasto': [88.9, 641.44, 633.01, 577.51, 184.3, 123.4, 234.5,765.4,423.1, 123.5],
+        'registros': [2, 7, 5, 12, 2,21,2,4,5,6]
+    })
+
+def mostrar_tela_login():
+    st.title("Login")
+    usuarios = carregar_usuarios()
+    email = st.text_input("Email")
+    senha = st.text_input("Senha", type="password")
+    if st.button("Entrar"):
+        verificar_login(email, senha, usuarios)
+        if 'logado' in st.session_state and st.session_state['logado']:
+            st.experimental_rerun()
+        else:
+            st.error("Usuário ou senha inválidos.")
+
+def fazer_previsoes(dados, metrica, dias_a_prever=90):
+    df_prophet = pd.DataFrame({
+        'ds': dados['data'],
+        'y': dados[metrica]
+    })
+    m = Prophet(yearly_seasonality=True, daily_seasonality=True)
+    m.fit(df_prophet)
+    futuro = m.make_future_dataframe(periods=dias_a_prever)
+    previsao = m.predict(futuro)
+    return previsao[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+
+
+def estimar_metrica(dados, novo_gasto, metrica):
+    media_ratio = dados[metrica].sum() / dados['gasto'].sum()
+    estimativa_metrica = novo_gasto * media_ratio
+    return estimativa_metrica
+
+def mostrar_tela_principal():
+#PAGINA 1
+    st.title(f"Bem vindo(a), {st.session_state['email']}")
+    dados = carregar_dados_atividade(st.session_state['id_cliente'])
+    impressoes_total = dados['impressoes'].sum()
+    cliques_total = dados['cliques'].sum()
+    registros_total = dados['registros'].sum()
+    gasto_total = dados['gasto'].sum()
+#PAGINA 2
+    st.write("### Totais atuais")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Impressões", impressoes_total)
+    col2.metric("Cliques", cliques_total)
+    col3.metric("Registros", registros_total)
+    col4.metric("Gasto", f"R$ {gasto_total:.2f}")
+    # Seletor para métrica do gráfico de linha
+    metrica = st.selectbox("Escolha a métrica para visualizar no gráfico", ['impressoes', 'cliques', 'registros', 'gasto'])
+    
+    # Previsões
+    previsoes = fazer_previsoes(dados, metrica)
+    
+#PAGINA 3  
+    # Plotando os resultados históricos e as previsões
+    fig, ax = plt.subplots()
+    ax.plot(dados['data'], dados[metrica], label='Histórico')
+    ax.plot(previsoes['ds'], previsoes['yhat'], label='Previsão', linestyle='--')
+    ax.fill_between(previsoes['ds'], previsoes['yhat_lower'], previsoes['yhat_upper'], alpha=0.3)
+    ax.set_title(f'{metrica.capitalize()} ao longo do tempo com previsões')
+    ax.set_xlabel('Data')
+    ax.set_ylabel(metrica.capitalize())
+    ax.legend()
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
+    # Criação do gráfico de barra para Gasto x Data
+    fig, ax = plt.subplots()
+    ax.bar(dados['data'], dados['gasto'], color='lightgreen')
+    ax.set_title('Gasto ao longo do tempo')
+    ax.set_xlabel('Data')
+    ax.set_ylabel('Gasto')
+    ax.grid(True)
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+    st.write("### Ajuste de Gastos")
+
+
+# Ajuste de Gastos e Estimativa de Resultados
+    st.write("### Ajuste de Gastos e Estimativa de Resultados")
+    novo_gasto = st.slider("Ajustar Gasto (R$)", min_value=gasto_total, max_value=2 * gasto_total, value=gasto_total, step=0.1)
+    if novo_gasto != gasto_total:
+        estimativa_impressoes = estimar_metrica(dados, novo_gasto, 'impressoes')
+        estimativa_cliques = estimar_metrica(dados, novo_gasto, 'cliques')
+        estimativa_registros = estimar_metrica(dados, novo_gasto, 'registros')
+        st.write(f"Com um novo gasto de R$ {novo_gasto:.2f}, estima-se aproximadamente {int(estimativa_impressoes)} impressões e {int(estimativa_cliques)} cliques e {int(estimativa_registros)} registros")
+
+
+    if st.button("Sair"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.experimental_rerun()
+
+if 'logado' not in st.session_state or not st.session_state['logado']:
+    mostrar_tela_login()
+else:
+    mostrar_tela_principal()
