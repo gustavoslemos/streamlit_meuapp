@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 from prophet import Prophet
+import matplotlib.pyplot as plt
+
+
 
 def carregar_usuarios():
     return pd.DataFrame({
@@ -17,7 +19,6 @@ def verificar_login(email, senha, usuarios):
         st.session_state['email'] = email
         st.session_state['id_cliente'] = usuario['id_cliente'].values[0]
         st.session_state['logado'] = True
-
 
 def carregar_dados_atividade(id_cliente):
     return pd.DataFrame({
@@ -53,7 +54,6 @@ def fazer_previsoes(dados, metrica, dias_a_prever=90):
     previsao = m.predict(futuro)
     return previsao[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
-
 def estimar_metrica(dados, novo_gasto, metrica):
     media_ratio = dados[metrica].sum() / dados['gasto'].sum()
     estimativa_metrica = novo_gasto * media_ratio
@@ -69,6 +69,23 @@ def mostrar_tela_principal():
     mostrar_previsoes = st.sidebar.button("Previsões")
     ajustar_gastos = st.sidebar.button("Ajuste de Gastos")
 
+    # Data Selector na barra lateral
+    data_range = st.sidebar.date_input(
+        "Selecionar intervalo de datas",
+        value=[dados['data'].min(), dados['data'].max()],
+        format='DD/MM/YYYY'
+    )
+
+    # Verificar se duas datas foram selecionadas
+    if len(data_range) == 2:
+        data_inicial, data_final = data_range
+    else:
+        st.sidebar.error("Selecione um intervalo de datas.")
+        return
+
+    # Filtrando dados pelo intervalo de datas
+    dados_filtrados = dados[(dados['data'] >= pd.to_datetime(data_inicial)) & (dados['data'] <= pd.to_datetime(data_final))]
+
     if mostrar_totais:
         st.session_state['pagina_atual'] = 'totais'
     if mostrar_previsoes:
@@ -80,24 +97,13 @@ def mostrar_tela_principal():
         if st.session_state['pagina_atual'] == 'totais':
             st.write("### Totais atuais")
             col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Impressões", dados['impressoes'].sum())
-            col2.metric("Cliques", dados['cliques'].sum())
-            col3.metric("Registros", dados['registros'].sum())
-            col4.metric("Gasto", f"R$ {dados['gasto'].sum():.2f}")
+            col1.metric("Impressões", dados_filtrados['impressoes'].sum())
+            col2.metric("Cliques", dados_filtrados['cliques'].sum())
+            col3.metric("Registros", dados_filtrados['registros'].sum())
+            col4.metric("Gasto", f"R$ {dados_filtrados['gasto'].sum():.2f}")
 
-            
-            # Gráfico de linha para as métricas
-            fig, ax = plt.subplots()
-            ax.plot(dados['data'], dados['impressoes'], label='Impressões', color='blue')
-            ax.plot(dados['data'], dados['cliques'], label='Cliques', color='red')
-            ax.plot(dados['data'], dados['registros'], label='Registros', color='green')
-            ax.plot(dados['data'], dados['gasto'], label='Gasto', color='purple')
-            ax.set_title('Métricas ao longo do tempo')
-            ax.set_xlabel('Data')
-            ax.set_ylabel('Valores')
-            ax.legend()
-            plt.xticks(rotation=45)
-            st.pyplot(fig)
+            # Gráficos padrão do Streamlit
+            st.line_chart(dados_filtrados.set_index('data')[['impressoes', 'cliques', 'registros', 'gasto']])
 
 
         elif st.session_state['pagina_atual'] == 'previsoes':
