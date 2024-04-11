@@ -84,6 +84,22 @@ def mostrar_tela_principal():
             col2.metric("Cliques", dados['cliques'].sum())
             col3.metric("Registros", dados['registros'].sum())
             col4.metric("Gasto", f"R$ {dados['gasto'].sum():.2f}")
+
+            
+            # Gráfico de linha para as métricas
+            fig, ax = plt.subplots()
+            ax.plot(dados['data'], dados['impressoes'], label='Impressões', color='blue')
+            ax.plot(dados['data'], dados['cliques'], label='Cliques', color='red')
+            ax.plot(dados['data'], dados['registros'], label='Registros', color='green')
+            ax.plot(dados['data'], dados['gasto'], label='Gasto', color='purple')
+            ax.set_title('Métricas ao longo do tempo')
+            ax.set_xlabel('Data')
+            ax.set_ylabel('Valores')
+            ax.legend()
+            plt.xticks(rotation=45)
+            st.pyplot(fig)
+
+
         elif st.session_state['pagina_atual'] == 'previsoes':
             metrica = st.selectbox("Escolha a métrica para visualizar no gráfico", ['impressoes', 'cliques', 'registros', 'gasto'])
             previsoes = fazer_previsoes(dados, metrica)
