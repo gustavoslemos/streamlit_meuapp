@@ -54,6 +54,9 @@ def fazer_previsoes(dados, metrica, dias_a_prever=90):
     return previsao[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
 
+
+
+
 def estimar_metrica(dados, novo_gasto, metrica):
     media_ratio = dados[metrica].sum() / dados['gasto'].sum()
     estimativa_metrica = novo_gasto * media_ratio
