@@ -20,6 +20,8 @@ def verificar_login(email, senha, usuarios):
         st.session_state['id_cliente'] = usuario['id_cliente'].values[0]
         st.session_state['logado'] = True
 
+
+
 def carregar_dados_atividade(id_cliente):
     return pd.DataFrame({
         'id_cliente': [id_cliente] * 10,
