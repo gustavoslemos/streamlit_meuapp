@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from prophet import Prophet
+import altair as alt
+
 
 def carregar_usuarios():
     return pd.DataFrame({
@@ -87,17 +89,43 @@ def mostrar_tela_principal():
             col2.metric("Cliques", dados['cliques'].sum())
             col3.metric("Registros", dados['registros'].sum())
             col4.metric("Gasto", f"R$ {dados['gasto'].sum():.2f}")
+
+
+
+
         elif st.session_state['pagina_atual'] == 'previsoes':
             metrica = st.selectbox("Escolha a métrica para visualizar no gráfico", ['impressoes', 'cliques', 'registros', 'gasto'])
             previsoes = fazer_previsoes(dados, metrica)
-            fig, ax = plt.subplots()
-            ax.plot(dados['data'], dados[metrica], label='Histórico')
-            ax.plot(previsoes['ds'], previsoes['yhat'], label='Previsão', linestyle='--')
-            ax.fill_between(previsoes['ds'], previsoes['yhat_lower'], previsoes['yhat_upper'], alpha=0.3)
-            ax.set_title(f'{metrica.capitalize()} ao longo do tempo com previsões')
-            ax.legend()
-            plt.xticks(rotation=45)
-            st.pyplot(fig)
+            dados_grafico = pd.concat([
+                pd.DataFrame({
+                    'data': dados['data'],
+                    'valor': dados[metrica],
+                    'tipo': 'Histórico'
+                }),
+                pd.DataFrame({
+                    'data': previsoes['ds'],
+                    'valor': previsoes['yhat'],
+                    'tipo': 'Previsão'
+                })
+            ])
+
+            chart = alt.Chart(dados_grafico).mark_line().encode(
+                x='data:T',
+                y='valor:Q',
+                color='tipo:N',
+                tooltip=['data:T', 'valor:Q', 'tipo:N']
+            ).properties(
+                title=f'{metrica.capitalize()} ao longo do tempo com previsões',
+                width=700,
+                height=400
+            ).interactive()
+
+            st.altair_chart(chart, use_container_width=True)
+
+
+
+
+
         elif st.session_state['pagina_atual'] == 'gastos':
             st.write("### Ajuste de Gastos e Estimativa de Resultados")
             novo_gasto = st.slider("Ajustar Gasto (R$)", min_value=dados['gasto'].sum(), max_value=2 * dados['gasto'].sum(), value=dados['gasto'].sum(), step=0.1)
